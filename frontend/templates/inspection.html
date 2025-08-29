@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Meta -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <title>VISDOM • Inspection</title>
+  <meta name="description" content="Run Laser, Critical, and Body inspections with level presets and advanced model selection. Local-first, production UI." />
+  <meta name="theme-color" content="#0a1020" />
+
+  <!-- CSP (no inline JS on this page) -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+                 img-src 'self' data: blob:;
+                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+                 font-src https://fonts.gstatic.com;
+                 script-src 'self';
+                 connect-src 'self';" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='uploads/Logo4.png') }}" />
+
+  <!-- Preconnects -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
+
+  <!-- Page layout tweaks (keep light; core tokens live in app.css) -->
+  <style>
+    :root{
+      --sidebar-w: 240px;
+      --surface-1: rgba(255,255,255,.06);
+      --surface-2: rgba(255,255,255,.10);
+      --text-3: #98a1b3;
+    }
+    body{min-height:100vh; display:grid; grid-template-rows:auto 1fr; background:var(--bg,#0a1020);}
+    header.appbar{
+      position:sticky; top:0; z-index:100; display:flex; align-items:center; gap:1rem;
+      padding:.75rem 1rem; background:rgba(0,0,0,.35); backdrop-filter:saturate(140%) blur(10px);
+      border-bottom:1px solid var(--surface-2);
+    }
+    header .brand{display:flex; align-items:center; gap:.6rem; text-decoration:none}
+    header .env{font-size:.75rem; padding:.2rem .5rem; border:1px solid var(--surface-2); border-radius:999px}
+    header .spacer{flex:1}
+    .layout{display:grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: calc(100vh - 56px);}
+    aside.sidebar{
+      border-right:1px solid var(--surface-2); padding:1rem .75rem; position:sticky; top:56px;
+      height: calc(100vh - 56px); overflow:auto; background:rgba(255,255,255,.02);
+    }
+    .nav-section{margin-bottom:1.25rem}
+    .nav-section h4{font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-3); margin:.25rem .5rem}
+    .vnav{list-style:none; padding:0; margin:.25rem 0}
+    .vnav a{display:flex; align-items:center; gap:.6rem; padding:.55rem .6rem; border-radius:.5rem; text-decoration:none}
+    .vnav a[aria-current="page"]{background:var(--surface-1);}
+    main.console{padding:1.25rem 1.25rem 2.5rem; overflow:auto;}
+    .grid{display:grid; gap:1rem}
+    .grid.cols-2{grid-template-columns: repeat(12,1fr)}
+    .card{background:var(--surface-1); border:1px solid var(--surface-2); border-radius:16px; padding:1rem;}
+    .card h3{margin:.25rem 0 .5rem}
+    .muted{color:var(--text-3)}
+    .list-tight{margin:.25rem 0 0; padding-left:1.1rem}
+    .pill{display:inline-block; padding:.15rem .5rem; border-radius:999px; background:var(--surface-2); font-size:.7rem}
+    .status-inline{display:inline-block; min-height:1.5rem}
+    .light{display:inline-block; width:12px; height:12px; border-radius:50%; border:2px solid rgba(255,255,255,.28); margin-left:.4rem}
+    .light.red{background:#ff4d4f}.light.orange{background:#ffa940}.light.yellow{background:#fadb14}.light.green{background:#52c41a}
+    .fieldset-reset{border:0; padding:0; margin:0}
+    .inline-control{display:inline-flex; align-items:center; gap:.5rem; margin-right:1rem}
+    .level-group{display:grid; gap:.75rem; margin-top:.25rem}
+    .badge{display:inline-block; font:inherit; font-size:.8rem; letter-spacing:.02em; padding:.25rem .5rem; border-radius:999px; background:var(--surface-2)}
+    details.advanced{border:1px solid var(--surface-2); border-radius:.75rem; padding:.75rem 1rem; background:rgba(255,255,255,.03)}
+    details.advanced > summary{cursor:pointer; list-style:none; outline:none}
+    details.advanced > summary::-webkit-details-marker{display:none}
+    .adv-grid{display:grid; gap:1rem; margin-top:.75rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))}
+    .sr-only{position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden}
+    footer{padding:1rem; color:var(--text-3); border-top:1px solid var(--surface-2)}
+    @media (max-width: 1024px){
+      :root{ --sidebar-w: 200px; }
+      .grid.cols-2{grid-template-columns: 1fr}
+    }
+  </style>
+</head>
+
+<body data-app="visdom" data-page="inspection">
+  <a href="#content" class="sr-only">Skip to content</a>
+
+  <!-- Top App Bar -->
+  <header class="appbar" role="banner">
+    <a href="{{ url_for('index') }}" class="brand" aria-label="VISDOM Home">
+      <img src="{{ url_for('static', filename='uploads/Logo_front.png') }}" alt="VISDOM Logo" width="44" height="30" />
+      <strong>VISDOM • Inspection</strong>
+      <span class="env">v{{ build_version|default('0.1.0') }}</span>
+    </a>
+    <span class="spacer"></span>
+
+    <div class="top-actions" style="display:flex; gap:.75rem; align-items:center">
+      <span class="muted">Status</span>
+      <span id="master-light" class="light green" aria-label="Idle"></span>
+      <span id="master-status" class="status-inline muted">Idle.</span>
+
+      <!-- Safe shutdown (POST) -->
+      <form action="{{ url_for('shutdown') }}" method="post">
+        <button id="shutdown-btn" class="btn btn-danger" type="submit" title="Close VISDOM">⏻ Shutdown</button>
+      </form>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" role="navigation" aria-label="Primary">
+      <div class="nav-section">
+        <h4>Overview</h4>
+        <ul class="vnav">
+          <li><a href="{{ url_for('index') }}">Home</a></li>
+          <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <h4>Modules</h4>
+        <ul class="vnav">
+          <li><a href="{{ url_for('crop_page') }}">Crop</a></li>
+          <li><a href="{{ url_for('ocr') }}">OCR</a></li>
+          <li><a href="{{ url_for('verify_init') }}">Compare</a></li>
+          <li><a href="{{ url_for('inspection') }}" aria-current="page">Inspection</a></li>
+          <li><a href="{{ url_for('manual_inspection') }}">Manual Inspection</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <h4>Help</h4>
+        <ul class="vnav">
+          <li><a href="#" onclick="document.getElementById('toast').textContent='Docs coming soon';return false;">Documentation</a></li>
+          <li><a href="#" onclick="document.getElementById('toast').textContent='Shortcuts: Shift+I inspect';return false;">Keyboard Shortcuts</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main console -->
+    <main id="content" class="console" role="main">
+      <!-- Intro -->
+      <section class="grid" aria-label="Intro">
+        <div class="card">
+          <h1 style="margin:.25rem 0 .25rem">Inspection</h1>
+          <p class="muted">Run model inference on <strong>Laser</strong>, <strong>Critical</strong>, and <strong>Body</strong> regions. Presets: <span class="pill">Mini</span> <span class="pill">Moderate</span> <span class="pill">Max</span>. Advanced lets you override Mini/Moderate model choices.</p>
+          <p class="muted" style="margin:.25rem 0 0">Body inspection has no level toggle.</p>
+        </div>
+
+        <div class="card">
+          <h3>Paths</h3>
+          <ul class="list-tight muted">
+            <li>Images: <code>data/images/</code></li>
+            <li>Outputs: <code>data/output/</code></li>
+            <li>CSVs: <code>data/csv/</code></li>
+          </ul>
+          <p class="muted" style="margin-top:.5rem">Local filesystem only. No cloud.</p>
+        </div>
+      </section>
+
+      <!-- Level configuration -->
+      <section class="card" aria-label="Levels">
+        <h2 class="sr-only">Level Configuration</h2>
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap:1rem">
+          <!-- Laser -->
+          <fieldset id="laser-config" class="fieldset-reset" aria-labelledby="laser-level-label" data-scope="laser">
+            <legend id="laser-level-label">Laser Inspection</legend>
+
+            <div class="level-group" role="radiogroup" aria-label="Laser level">
+              <label class="inline-control">
+                <input type="radio" name="laser-level" value="mini" />
+                <span>Mini <span class="badge">default: MaxViT</span></span>
+              </label>
+              <label class="inline-control">
+                <input type="radio" name="laser-level" value="moderate" />
+                <span>Moderate <span class="badge">default: MaxViT + CoaT</span></span>
+              </label>
+              <label class="inline-control">
+                <input type="radio" name="laser-level" value="max" checked />
+                <span>Max <span class="badge">all three models</span></span>
+              </label>
+            </div>
+
+            <details class="advanced" id="laser-advanced">
+              <summary>Advanced selection (optional) <span class="muted">— set custom models for Mini/Moderate</span></summary>
+              <div class="adv-grid">
+                <fieldset class="fieldset-reset" aria-labelledby="laser-mini-legend">
+                  <legend id="laser-mini-legend">Mini • Choose 1 model</legend>
+                  <p class="muted">If unset, Mini runs <strong>MaxViT</strong>.</p>
+                  <div class="level-group" role="radiogroup" aria-label="Laser mini model">
+                    <label class="inline-control"><input type="radio" name="laser-mini-model" value="maxvit" checked /><span>MaxViT</span></label>
+                    <label class="inline-control"><input type="radio" name="laser-mini-model" value="swinv2" /><span>SwinV2</span></label>
+                    <label class="inline-control"><input type="radio" name="laser-mini-model" value="coat" /><span>CoaT</span></label>
+                  </div>
+                </fieldset>
+
+                <fieldset class="fieldset-reset" aria-labelledby="laser-moderate-legend">
+                  <legend id="laser-moderate-legend">Moderate • Choose 2 models</legend>
+                  <p class="muted">If unset, Moderate runs <strong>MaxViT + CoaT</strong>.</p>
+                  <div class="level-group" role="radiogroup" aria-label="Laser moderate model pair">
+                    <label class="inline-control"><input type="radio" name="laser-moderate-pair" value="maxvit+coat" checked /><span>MaxViT + CoaT</span></label>
+                    <label class="inline-control"><input type="radio" name="laser-moderate-pair" value="maxvit+swinv2" /><span>MaxViT + SwinV2</span></label>
+                    <label class="inline-control"><input type="radio" name="laser-moderate-pair" value="swinv2+coat" /><span>SwinV2 + CoaT</span></label>
+                  </div>
+                </fieldset>
+
+                <fieldset class="fieldset-reset" aria-labelledby="laser-max-legend">
+                  <legend id="laser-max-legend">Max</legend>
+                  <p class="muted">Max always runs <strong>all three</strong>: SwinV2, CoaT, MaxViT.</p>
+                </fieldset>
+              </div>
+            </details>
+          </fieldset>
+
+          <!-- Critical -->
+          <fieldset id="critical-config" class="fieldset-reset" aria-labelledby="critical-level-label" data-scope="critical">
+            <legend id="critical-level-label">Critical Inspection</legend>
+
+            <div class="level-group" role="radiogroup" aria-label="Critical level">
+              <label class="inline-control">
+                <input type="radio" name="critical-level" value="mini" />
+                <span>Mini <span class="badge">default: MaxViT</span></span>
+              </label>
+              <label class="inline-control">
+                <input type="radio" name="critical-level" value="moderate" />
+                <span>Moderate <span class="badge">default: MaxViT + CoaT</span></span>
+              </label>
+              <label class="inline-control">
+                <input type="radio" name="critical-level" value="max" checked />
+                <span>Max <span class="badge">all three models</span></span>
+              </label>
+            </div>
+
+            <details class="advanced" id="critical-advanced">
+              <summary>Advanced selection (optional) <span class="muted">— set custom models for Mini/Moderate</span></summary>
+              <div class="adv-grid">
+                <fieldset class="fieldset-reset" aria-labelledby="critical-mini-legend">
+                  <legend id="critical-mini-legend">Mini • Choose 1 model</legend>
+                  <p class="muted">If unset, Mini runs <strong>MaxViT</strong>.</p>
+                  <div class="level-group" role="radiogroup" aria-label="Critical mini model">
+                    <label class="inline-control"><input type="radio" name="critical-mini-model" value="maxvit" checked /><span>MaxViT</span></label>
+                    <label class="inline-control"><input type="radio" name="critical-mini-model" value="swinv2" /><span>SwinV2</span></label>
+                    <label class="inline-control"><input type="radio" name="critical-mini-model" value="coat" /><span>CoaT</span></label>
+                  </div>
+                </fieldset>
+
+                <fieldset class="fieldset-reset" aria-labelledby="critical-moderate-legend">
+                  <legend id="critical-moderate-legend">Moderate • Choose 2 models</legend>
+                  <p class="muted">If unset, Moderate runs <strong>MaxViT + CoaT</strong>.</p>
+                  <div class="level-group" role="radiogroup" aria-label="Critical moderate model pair">
+                    <label class="inline-control"><input type="radio" name="critical-moderate-pair" value="maxvit+coat" checked /><span>MaxViT + CoaT</span></label>
+                    <label class="inline-control"><input type="radio" name="critical-moderate-pair" value="maxvit+swinv2" /><span>MaxViT + SwinV2</span></label>
+                    <label class="inline-control"><input type="radio" name="critical-moderate-pair" value="swinv2+coat" /><span>SwinV2 + CoaT</span></label>
+                  </div>
+                </fieldset>
+
+                <fieldset class="fieldset-reset" aria-labelledby="critical-max-legend">
+                  <legend id="critical-max-legend">Max</legend>
+                  <p class="muted">Max always runs <strong>all three</strong>: SwinV2, CoaT, MaxViT.</p>
+                </fieldset>
+              </div>
+            </details>
+          </fieldset>
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <section class="card" aria-label="Actions">
+        <h2 class="sr-only">Actions</h2>
+        <div class="cta-container" style="display:flex; flex-wrap:wrap; gap:.75rem; align-items:center">
+          <button id="inspect-laser-btn" class="btn" type="button">Inspect Laser</button>
+          <button id="inspect-critical-btn" class="btn outline" type="button">Inspect Critical</button>
+          <button id="inspect-body-btn" class="btn ghost" type="button">Inspect Body</button>
+          <span id="inspection-status" class="status-inline muted" aria-live="polite"></span>
+        </div>
+        <p class="muted" style="margin:.5rem 0 0">Defaults: <strong>Max</strong> runs all three models. Use “Advanced” only to override Mini/Moderate.</p>
+      </section>
+
+      <!-- Optional: Recent results (placeholder; main.js can populate if desired) -->
+      <section class="card" aria-label="Recent Results">
+        <h3>Recent Results</h3>
+        <p class="muted">Latest inspection summaries (when available).</p>
+        <div class="list" style="max-height:300px; overflow:auto; border:1px solid var(--surface-2); border-radius:12px">
+          <table style="width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:.9rem">
+            <thead>
+              <tr>
+                <th style="position:sticky;top:0;background:var(--surface-2);text-align:left;padding:.45rem .55rem">Region</th>
+                <th style="position:sticky;top:0;background:var(--surface-2);text-align:left;padding:.45rem .55rem">Level</th>
+                <th style="position:sticky;top:0;background:var(--surface-2);text-align:left;padding:.45rem .55rem">Images</th>
+                <th style="position:sticky;top:0;background:var(--surface-2);text-align:left;padding:.45rem .55rem">Defective %</th>
+                <th style="position:sticky;top:0;background:var(--surface-2);text-align:left;padding:.45rem .55rem">Duration</th>
+              </tr>
+            </thead>
+            <tbody id="inspect-runs-tbody">
+              <tr><td colspan="5" class="muted" style="padding:.6rem">No runs yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite">Ready.</div>
+
+  <!-- Footer -->
+  <footer class="site-footer" role="contentinfo">
+    <p class="muted">&copy; VISDOM — Visual Inspection System for Defect Observation and Monitoring.</p>
+  </footer>
+
+  <!-- Main JS -->
+  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+</body>
+</html>

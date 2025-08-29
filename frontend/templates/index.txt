@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Required meta -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+  <!-- SEO / PWA basics -->
+  <title>VISDOM • Overview</title>
+  <meta name="description" content="VISDOM: an automated visual inspection toolkit for semiconductor laser die images — crop, OCR, compare, and inspect with a production-ready UI." />
+  <meta name="theme-color" content="#0a1020" />
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}" />
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='uploads/Logo4.png') }}" />
+
+  <!-- Preconnects -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+
+  <!-- Page-only tweaks -->
+  <style>
+    /* section dividers */
+    section + section {
+      border-top: 1px solid var(--surface-2, rgba(255,255,255,.12));
+      margin-top: 2rem;
+      padding-top: 2rem;
+    }
+    .pill {
+      display: inline-block;
+      padding: .25rem .6rem;
+      border-radius: 999px;
+      background: var(--surface-2, rgba(255,255,255,.08));
+      font-size: .75rem;
+      line-height: 1;
+      margin-right: .4rem;
+      white-space: nowrap;
+    }
+    .small-muted { font-size: .9rem; color: var(--text-3,#a4a7b0); }
+    .list-tight { margin: .5rem 0 0; padding-left: 1.1rem; }
+    .list-tight li { margin:.25rem 0; }
+
+    /***** Master status light *****/
+    .light{
+      display:inline-block; width:12px; height:12px; border-radius:50%;
+      border:2px solid rgba(255,255,255,.3); vertical-align:middle; margin-left:.5rem;
+    }
+    .light.red{background:#ff4d4f}
+    .light.orange{background:#ffa940}
+    .light.yellow{background:#fadb14}
+    .light.green{background:#52c41a}
+    .status-inline{display:inline-block; min-height:1.25rem; margin-left:.5rem}
+  </style>
+
+  <!-- CSP -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self';" />
+</head>
+
+<body class="page-enter" data-app="visdom">
+  <!-- Skip link -->
+  <a href="#main" class="sr-only">Skip to main content</a>
+
+  <!-- Header / Navigation -->
+  <header role="banner">
+    <nav aria-label="Primary Navigation">
+      <a href="{{ url_for('index') }}" class="brand" aria-label="VISDOM Home">
+        <img
+          src="{{ url_for('static', filename='uploads/Logo_front.png') }}"
+          alt="VISDOM Logo"
+          width="60"
+          height="40"
+          decoding="async"
+          fetchpriority="low"
+        />
+      </a>
+      <ul role="menubar">
+        <li><a role="menuitem" href="{{ url_for('index') }}" aria-current="page">Home</a></li>
+        <li><a role="menuitem" href="{{ url_for('crop_page') }}">Crop</a></li>
+        <li><a role="menuitem" href="{{ url_for('ocr') }}">OCR</a></li>
+        <li><a role="menuitem" href="{{ url_for('verify_init') }}">Compare</a></li>
+        <!-- ML inspection -->
+        <li><a role="menuitem" href="{{ url_for('inspection') }}">Inspection</a></li>
+        <!-- Manual inspection -->
+        <li><a role="menuitem" href="{{ url_for('manual_inspection') }}">Manual Inspection</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Main -->
+  <main id="main" class="container" role="main">
+    <!-- Hero -->
+    <section aria-label="Introduction" class="anim rise" data-delay=".06s">
+      <h1 class="page-title">VISDOM</h1>
+      <p class="text-secondary">Automated visual inspection toolkit for semiconductor laser die images.</p>
+      <p class="muted mt-2">Drive-first I/O, model inference orchestration, and verification workflows — wrapped in a production-ready UI.</p>
+    </section>
+
+    <!-- About -->
+    <section aria-labelledby="about-title" class="anim rise" data-delay=".08s">
+      <h2 id="about-title">What is VISDOM?</h2>
+      <p>VISDOM streamlines inspection workflows — pulling images from Drive, running model inference,
+         validating OCR, and exporting reports — with resilient backend integrations and clear operator UX.</p>
+      <p class="muted mt-2">Note: This overview is informational. Interactive features live on their own module pages.</p>
+    </section>
+
+    <!-- Modules -->
+    <section aria-labelledby="modules-title" class="anim rise" data-delay=".10s" data-stagger>
+      <h2 id="modules-title">Modules</h2>
+      <ul class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px,1fr));">
+        <li class="card">
+          <h3>Crop</h3>
+          <p class="text-secondary">Generate precise region crops (<em>Body</em>, <em>Critical</em>, <em>Laser</em>), with lossless saving for downstream ML.</p>
+          <p class="mt-2"><a class="cta-secondary" href="{{ url_for('crop_page') }}" aria-label="Open Crop module">Open Crop</a></p>
+        </li>
+        <li class="card">
+          <h3>OCR</h3>
+          <p class="text-secondary">Recognize 6-character alphanumeric IDs (0-9, A-G). Merges YOLO + CRNN predictions into CSVs on Drive.</p>
+          <p class="mt-2"><a class="cta-secondary" href="{{ url_for('ocr') }}" aria-label="Open OCR module">Open OCR</a></p>
+        </li>
+        <li class="card">
+          <h3>Compare</h3>
+          <p class="text-secondary">Side-by-side review of YOLO and CRNN predictions with approve/fix workflow and verified CSV export.</p>
+          <p class="mt-2"><a class="cta-secondary" href="{{ url_for('verify_init') }}" aria-label="Open Compare module">Open Compare</a></p>
+        </li>
+        <li class="card">
+          <h3>
+            Inspection
+            <span class="pill">Mini</span>
+            <span class="pill">Moderate</span>
+            <span class="pill">Max</span>
+          </h3>
+          <p class="text-secondary">
+            ML-based inspection for <em>Laser</em>, <em>Critical</em>, and <em>Body</em> with level toggles.
+          </p>
+          <ul class="list-tight small-muted">
+            <li><strong>Mini</strong>: MaxViT only</li>
+            <li><strong>Moderate</strong>: MaxViT + CoAtNet</li>
+            <li><strong>Max</strong>: SwinV2 + MaxViT + CoAtNet</li>
+          </ul>
+          <p class="small-muted mt-1">Advanced (optional): choose any 1 for Mini, any 2 for Moderate, or all 3 for Max — inside the Inspection page.</p>
+          <p class="mt-2">
+            <a class="cta-secondary" href="{{ url_for('inspection') }}" aria-label="Open Inspection module">Open Inspection</a>
+          </p>
+        </li>
+        <li class="card">
+          <h3>Manual Inspection</h3>
+          <p class="text-secondary">Review all defective images, see per-model CSV outputs, verify decisions, and export <code>manually_verified_results.csv</code>.</p>
+          <p class="mt-2">
+            <a class="cta-secondary" href="{{ url_for('manual_inspection') }}" aria-label="Open Manual Inspection module">
+              Open Manual Inspection
+            </a>
+          </p>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Automation (Master button + status light) -->
+    <section aria-labelledby="auto-title" class="anim rise" data-delay=".12s">
+      <h2 id="auto-title">Automation</h2>
+
+      <div class="card">
+        <p class="muted">
+          One‑click pipeline: <strong>Crop</strong> → <strong>Split</strong> → <strong>OCR</strong> → 
+          <strong>Critical (Max)</strong> → <strong>Laser (Max)</strong> → <strong>Body</strong> → <strong>Prepare Defects</strong>.
+          Each step runs only if there are new images since the last successful run.
+        </p>
+
+        <!-- Automation controls (master orchestrator) -->
+        <div class="form-actions" style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+          <button id="master-btn" class="btn btn-primary">Run full automation</button>
+          <span id="master-light" class="light green" aria-label="Idle"></span>
+          <span id="master-status" class="status-inline">Idle.</span>
+        </div>
+
+        <p class="small-muted mt-1">
+          Light legend: <strong>red</strong> = idle/error, <strong>orange</strong> = running (crop/split),
+          <strong>yellow</strong> = OCR/inspections, <strong>green</strong> = complete.
+        </p>
+        <p class="small-muted">
+          Idempotent runs: buttons will show <em>No new images</em> if nothing to process, otherwise they display the number of new images detected.
+        </p>
+      </div>
+    </section>
+
+    <!-- Notes -->
+    <section aria-labelledby="notes-title" class="anim rise" data-delay=".14s">
+      <h2 id="notes-title">Notes</h2>
+      <ul>
+        <li>Image I/O is Drive-first; local temp files are cleaned automatically.</li>
+        <li>Outputs are lossless where specified (e.g., PNG for crops).</li>
+        <li>This page introduces VISDOM; all functionality is on module pages.</li>
+      </ul>
+    </section>
+
+    <noscript>
+      <p class="noscript-warning">JavaScript is required for interactive modules and live status updates.</p>
+    </noscript>
+  </main>
+
+  <!-- Global toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite">Ready.</div>
+
+  <!-- Footer -->
+  <footer role="contentinfo">
+    <p>&copy; VISDOM • Visual Inspection System for Defect Observation and Monitoring — Powered by @AyarLabs</p>
+  </footer>
+
+  <!-- App JS -->
+  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+</body>
+</html>

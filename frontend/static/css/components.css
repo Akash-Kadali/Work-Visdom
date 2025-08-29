@@ -1,0 +1,217 @@
+/* ==========================================================================
+   VISDOM • Components (Ayar Labs · Outfit only)
+   - Zero extra fonts; relies on tokens from base.css
+   - Safer fallbacks (no backdrop-filter dependency), logical props, A11Y
+   ========================================================================== */
+
+/* ========================= NAVBAR ======================================= */
+nav{
+  position: sticky; inset-block-start: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: clamp(.75rem, 1.5vw, 1rem) clamp(1rem, 3vw, 2.5rem);
+  /* Fallback background if no backdrop-filter support */
+  background: linear-gradient(180deg, rgba(10,16,32,.92), rgba(10,16,32,.7));
+  border-block-end: 1px solid var(--surface-2, rgba(255,255,255,.12));
+  box-shadow: var(--shadow);
+  margin-block-end: clamp(1rem, 3vw, 2rem);
+  /* Avoid content under iOS notch */
+  padding-block-start: max(env(safe-area-inset-top), clamp(.75rem, 1.5vw, 1rem));
+}
+@supports (backdrop-filter: blur(10px)){
+  nav{ backdrop-filter: saturate(120%) blur(10px); }
+}
+
+.nav-left{ display:flex; align-items:center; gap: 1rem; min-width: 0; }
+
+/* Brand title (optional) */
+.nav-title{
+  font: 800 clamp(1.05rem, 2.2vw, 1.55rem)/1 var(--font-sans);
+  letter-spacing:-.02em; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  background: linear-gradient(92deg, var(--accent, #6ea8fe), var(--primary-400, #38bdf8));
+  -webkit-background-clip:text; background-clip:text; color: transparent;
+}
+
+/* Horizontal menu */
+nav ul{
+  display:flex; align-items:center; gap: clamp(.6rem, 2.2vw, 1.75rem);
+  list-style:none; margin:0; padding:0;
+}
+
+/* Menu links (lower specificity via :where) */
+nav ul :where(a){
+  display:inline-flex; align-items:center; gap:.5rem;
+  font: 600 .97rem/1 var(--font-sans);
+  color: var(--text-200); text-decoration:none;
+  padding: .55rem .85rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .12s ease;
+}
+@media (hover:hover){
+  nav ul a:hover{ background: rgba(255,255,255,.06); color: var(--text-100); }
+}
+nav ul a:active{ transform: translateY(1px); }
+nav ul a:focus-visible{ outline: none; box-shadow: var(--focus); }
+
+/* Active/current page + keyboard focus-visible ring */
+nav ul a[aria-current="page"]{
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.14);
+  color: var(--text-100);
+}
+
+.btn.btn-danger{ background:#b42318; border-color:#b42318; color:#fff }
+.btn.btn-danger:disabled{ opacity:.6; cursor:not-allowed }
+
+
+/* CTA in navbar */
+.cta-nav-button{
+  font: 700 .98rem/1 var(--font-sans);
+  padding: .6rem 1rem;
+  color: #0a1020;
+  background: linear-gradient(180deg, #d6e4ff, #9ec3ff);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 12px;
+  box-shadow: var(--focus);
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .2s ease, opacity .2s ease;
+}
+@media (hover:hover){
+  .cta-nav-button:hover{ transform: translateY(-1px); }
+}
+.cta-nav-button:active{ transform: translateY(0); }
+.cta-nav-button:disabled{ opacity:.55; cursor:not-allowed; }
+
+/* Collapse / tighten on small screens */
+@media (max-width: 840px){
+  nav{ padding-inline: clamp(.75rem, 3vw, 1.25rem); }
+  nav ul{ gap: .6rem; }
+  .nav-title{ display:none; } /* keep brand logo, drop text for space */
+}
+
+/* ========================= HEADINGS ===================================== */
+h1.page-title{
+  font: 800 clamp(1.9rem, 4.2vw, 2.8rem)/1.08 var(--font-sans);
+  letter-spacing:-.02em; text-align:center; margin-block: 1rem .25rem;
+  background: linear-gradient(92deg, var(--text-100), var(--text-200));
+  -webkit-background-clip:text; background-clip:text; color: transparent;
+  text-shadow: 0 8px 26px rgba(0,0,0,.25);
+}
+h2{
+  font: 700 clamp(1.1rem, 2.2vw, 1.5rem)/1.2 var(--font-sans);
+  color: var(--text-100); margin-block: .25rem .85rem;
+}
+
+/* ========================= SECTIONS / CARDS ============================= */
+section{
+  background: var(--surface-1, rgba(255,255,255,.06));
+  border: 1px solid var(--border, rgba(255,255,255,.14));
+  border-radius: var(--radius, 14px);
+  padding: clamp(1rem, 2.5vw, 2rem);
+  color: var(--text-200);
+  box-shadow: var(--shadow);
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+  will-change: transform;
+}
+@media (hover:hover){
+  section:hover{
+    transform: translateY(-3px);
+    box-shadow: 0 16px 48px rgba(0,0,0,.40);
+    border-color: rgba(255,255,255,.22);
+  }
+}
+
+/* List styling within sections */
+section li{
+  position:relative; padding-inline-start: 1.25rem;
+  color: var(--text-400);
+}
+section li+li{ margin-block-start: .35rem; }
+section li::before{
+  content:'→';
+  position:absolute; inset-inline-start: 0; inset-block-start: 0;
+  color: var(--accent, #6ea8fe); opacity:.75;
+}
+
+/* ========================= CTA BLOCKS =================================== */
+.cta-container{
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+  gap: clamp(.8rem, 2.2vw, 1.5rem);
+  margin-block: clamp(1rem, 2.2vw, 1.75rem) clamp(1.5rem, 3vw, 2.25rem);
+}
+
+/* Primary / Secondary CTAs share base */
+.cta-primary, .cta-secondary{
+  font: 700 1rem/1 var(--font-sans);
+  min-inline-size: clamp(200px, 28vw, 240px);
+  text-align:center;
+  padding: .85rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.18);
+  cursor:pointer;
+  transition: transform .12s ease, box-shadow .2s ease, opacity .2s ease, background .2s ease;
+}
+
+/* Variants */
+.cta-primary{
+  color:#0a1020;
+  background: linear-gradient(180deg, #e9f0ff, #b7d1ff);
+  box-shadow: var(--focus);
+}
+@media (hover:hover){
+  .cta-primary:hover{ transform: translateY(-2px); }
+}
+
+.cta-secondary{
+  color: var(--text-100);
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+  /* only blur if supported */
+}
+@supports (backdrop-filter: blur(4px)){
+  .cta-secondary{ backdrop-filter: blur(4px); }
+}
+@media (hover:hover){
+  .cta-secondary:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 0 18px var(--primary-600, #155eab);
+  }
+}
+
+/* ========================= FOOTER ======================================= */
+footer{
+  font: 500 .95rem/1.5 var(--font-sans);
+  color: var(--text-600);
+  text-align:center;
+  padding: 2rem 1rem;
+  border-block-start: 1px solid var(--surface-2, rgba(255,255,255,.12));
+}
+
+/* ========================= TOAST ======================================== */
+#toast{
+  font: 700 .95rem/1 var(--font-sans);
+  position: fixed; inset-inline-start: 50%; inset-block-end: -100px;
+  transform: translateX(-50%) scale(.96);
+  background: linear-gradient(180deg, #eafff8, #b8ffe8);
+  color: #0a1020;
+  padding: .75rem 1.25rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.25);
+  box-shadow: var(--shadow);
+  opacity: 0; z-index: 9999;
+  transition: opacity .35s ease, inset-block-end .35s ease, transform .35s ease;
+}
+#toast.show{
+  opacity:1; inset-block-end: 20px; transform: translateX(-50%) scale(1);
+}
+
+/* ========================= ACCESSIBILITY / MOTION ======================= */
+@media (prefers-reduced-motion: reduce){
+  *{ animation: none !important; transition: none !important; }
+}
+
+/* ========================= SMALL SCREENS ================================ */
+@media (max-width: 560px){
+  h1.page-title{ margin-block-start: .5rem; }
+  section{ padding: 1rem; }
+  .cta-primary, .cta-secondary{ min-inline-size: 100%; }
+}

@@ -1,0 +1,23 @@
+/* style.css — single entrypoint, ordered cascade via CSS Layers */
+@layer reset, tokens, base, components, utilities, animations, overrides;
+
+/* Import each file into a layer (supported in modern browsers) */
+@import url("./base.css") layer(base);
+@import url("./components.css") layer(components);
+@import url("./animations.css") layer(animations);
+
+/* Optional local utilities/overrides (kept tiny) */
+@layer utilities {
+  /* Tailwind-like shims used in verify.html */
+  .max-w-5xl{ max-width: 64rem; }
+  .mx-auto{ margin-left:auto; margin-right:auto; }
+  .px-4{ padding-left:1rem; padding-right:1rem; }
+  .py-8{ padding-top:2rem; padding-bottom:2rem; }
+  .text-center{ text-align:center; }
+  .text-sm{ font-size:.9rem; }
+  .space-y-1 > * + * { margin-top:.25rem; }
+}
+
+@layer overrides {
+  /* Project-specific last-mile tweaks can live here when needed */
+}

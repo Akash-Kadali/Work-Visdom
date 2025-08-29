@@ -1,0 +1,259 @@
+# === PAGES / NAV ===
+home:
+  label: "🏠 Home"
+  route: "/"
+  method: "GET"
+  description: "Landing page."
+  visible: true
+
+crop_page:
+  label: "✂️ Crop 20 + Code (Page)"
+  route: "/crop"
+  method: "GET"
+  description: "Open the Crop page to start Drive-based cropping."
+  visible: true
+
+ocr_page:
+  label: "🔍 OCR (Page)"
+  route: "/ocr"
+  method: "GET"
+  description: "Open the OCR page to run YOLO + CRNN and merge results."
+  visible: true
+
+inspection_page:
+  label: "🧪 Inspection (Models Page)"
+  route: "/inspection"
+  method: "GET"
+  description: "Open the ML inspection controls."
+  visible: true
+
+manual_inspection_page:
+  label: "🧑‍⚖️ Manual Inspection (Page)"
+  route: "/manual_inspection"
+  method: "GET"
+  description: "Open the manual inspection viewer."
+  visible: true
+
+verify_init:
+  label: "📝 Start Verification (Page)"
+  route: "/verify_init"
+  method: "GET"
+  description: "Start the mismatch verification UI."
+  visible: true
+
+
+# === PIPELINE (CROP → SPLIT → OCR) ===
+crop_drive:
+  label: "✂️ Run Crop 20 + Code"
+  route: "/crop_drive"
+  method: "POST"
+  description: "Detect top 20 lasers + unique code and write crops to Drive."
+  visible: true
+
+split_drive:
+  label: "🧩 Split Laser 20 → Body/Critical/Laser2 (PNG)"
+  route: "/split_drive"
+  method: "POST"
+  description: "From Laser-20 crops, save lossless PNGs to Body, Critical, and Laser2 Drive folders."
+  visible: true
+
+run_pipeline:
+  label: "🚀 Run Full OCR Pipeline"
+  route: "/run_pipeline"
+  method: "POST"
+  description: "Run YOLO and CRNN inference and prepare mismatches for review."
+  visible: true
+
+
+# === VERIFICATION (MISMATCH REVIEW) ===
+verify_data:
+  label: "📥 Load Verification Items"
+  route: "/verify_data"
+  method: "GET"
+  description: "Fetch mismatches (or all when requested) for the verify UI."
+  visible: false
+
+save_verifications:
+  label: "💾 Save Corrections"
+  route: "/save_verifications"
+  method: "POST"
+  description: "Persist user-entered code corrections back to Drive."
+  visible: true
+
+apply_corrections_alias:
+  label: "💾 Save Corrections (Alias)"
+  route: "/apply_corrections"
+  method: "POST"
+  description: "Alias for /save_verifications."
+  visible: false
+
+
+# === INSPECTION JOBS (MODEL CLASSIFICATION) ===
+inspect_critical:
+  label: "🧪 Inspect Critical"
+  route: "/inspect_critical"
+  method: "POST"
+  description: "Run Critical classification."
+  visible: true
+
+inspect_laser:
+  label: "🔦 Inspect Laser"
+  route: "/inspect_laser"
+  method: "POST"
+  description: "Run Laser classification."
+  visible: true
+
+inspect_body:
+  label: "🧍 Inspect Body (CoaT)"
+  route: "/inspect_body"
+  method: "POST"
+  description: "Run Body classification using CoaT."
+  visible: true
+
+classify_body:
+  label: "🧍 Body → CoaT (Direct)"
+  route: "/classify/body"
+  method: "POST"
+  description: "Direct body classifier endpoint."
+  visible: false
+
+
+# === MANUAL INSPECTION (VIEWER + ACTIONS) ===
+manual_data:
+  label: "📦 Manual Data (for Viewer)"
+  route: "/manual_data"
+  method: "GET"
+  description: "Serve items + model votes for the manual inspection viewer."
+  visible: true
+
+manual_decision:
+  label: "✅ Set Decision (Base-aware)"
+  route: "/manual/decision"
+  method: "POST"
+  description: "Record GOOD/DEFECTIVE decision."
+  visible: true
+
+manual_confirm_toggle:
+  label: "🔕 Toggle Confirm Good"
+  route: "/manual/confirm_toggle"
+  method: "POST"
+  description: "Enable/disable confirm modal."
+  visible: false
+
+manual_undo:
+  label: "↩️ Undo (Manual)"
+  route: "/manual/undo"
+  method: "POST"
+  description: "Undo last manual decision action."
+  visible: true
+
+manual_items:
+  label: "📃 Manual Items (Legacy Panels)"
+  route: "/manual_items"
+  method: "GET"
+  description: "Legacy list endpoint for older UI."
+  visible: false
+
+rewrite_label:
+  label: "✏️ Rewrite Single Model Label"
+  route: "/rewrite_label"
+  method: "POST"
+  description: "Override a model vote for one image."
+  visible: false
+
+undo:
+  label: "↩️ Undo (Generic)"
+  route: "/undo"
+  method: "POST"
+  description: "Generic undo stack endpoint."
+  visible: false
+
+mark_defective_and_hide_root:
+  label: "🙈 Mark Defective & Hide Root"
+  route: "/mark_defective_and_hide_root"
+  method: "POST"
+  description: "Hide an entire root group from manual inspection queue."
+  visible: false
+
+
+# === DEFECT-ONLY FOLDERS ===
+prepare_defects:
+  label: "🗂️ Prepare Defect Folders"
+  route: "/prepare_defects"
+  method: "POST"
+  description: "Copy only defective images into defect folders."
+  visible: true
+
+prepare_defect_folders_alias:
+  label: "🗂️ Prepare Defect Folders (Alias)"
+  route: "/prepare_defect_folders"
+  method: "POST"
+  description: "Alias; same as /prepare_defects."
+  visible: true
+
+prepare_defects_status:
+  label: "📈 Prepare Defects Status"
+  route: "/prepare_defects/status"
+  method: "GET"
+  description: "Status for the defect-folder build."
+  visible: false
+
+
+# === JOB STATUS / PROXY ===
+job_status:
+  label: "📊 Job Status"
+  route: "/job_status"
+  method: "GET"
+  description: "Check status for jobs."
+  visible: true
+
+proxy:
+  label: "🛰️ Proxy Remote Image"
+  route: "/proxy"
+  method: "GET"
+  description: "Proxy remote/Drive image."
+  visible: false
+
+proxy_image:
+  label: "🛰️ Proxy Drive Image (by id)"
+  route: "/image/<file_id>"
+  method: "GET"
+  description: "Serve a Drive image by file id."
+  visible: false
+
+
+# === MASTER / AUTOMATION ===
+automation_start:
+  label: "🧰 Automation Start"
+  route: "/automation/start"
+  method: "POST"
+  description: "Start the full pipeline (canonical)."
+  visible: true
+
+automation_status:
+  label: "🧰 Automation Status"
+  route: "/automation/status"
+  method: "GET"
+  description: "Check pipeline status."
+  visible: true
+
+master_start_alias:
+  label: "🧰 Master Start (Alias)"
+  route: "/master/start"
+  method: "POST"
+  description: "Alias for /automation/start."
+  visible: true
+
+master_status_alias:
+  label: "🧰 Master Status (Alias)"
+  route: "/master/status"
+  method: "GET"
+  description: "Alias for /automation/status."
+  visible: true
+
+export_die_reports:
+  label: "📄 Export Die Reports (2 CSVs)"
+  route: "/export/die_reports"
+  method: "POST"
+  description: "Build die_all_models.csv + base_summary.csv"
+  visible: true

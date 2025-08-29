@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>VISDOM · Verify</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='uploads/Logo4.png') }}">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Outfit:wght@400;700&display=swap" rel="stylesheet"/>
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+
+  <!-- CSP -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self';" />
+
+  <!-- Page-scoped tweaks -->
+  <style>
+    .viewer { display:grid; gap:1rem; grid-template-columns: 1fr; }
+    .img-wrap { display:flex; align-items:center; justify-content:center; background:#111; border-radius:12px; min-height:360px; }
+    .img-wrap img { max-width:100%; max-height:70vh; display:block; }
+    .meta { display:grid; gap:.5rem; grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .stat { font-size:.9rem; opacity:.8 }
+    .pill { padding:.15rem .5rem; border-radius:999px; font-size:.85rem }
+    .ok  { background:#103; color:#8ef }
+    .bad { background:#301; color:#feb }
+    .toolbar { display:flex; gap:.5rem; align-items:center; justify-content:space-between; margin:.5rem 0 1rem; }
+    .btn { padding:.55rem .9rem; border-radius:10px; border:1px solid #2a2a2a; background:#181818; color:#eee; cursor:pointer }
+    .btn[disabled] { opacity:.5; cursor:not-allowed }
+    .ghost { background:transparent }
+    .counter { opacity:.8 }
+    .banner { background:#0f2914; color:#b5f4b5; border:1px solid #1f6a2b; padding:.75rem 1rem; border-radius:12px; display:none; }
+    .banner.show { display:block; }
+    .warn { background:#2a1a00; color:#ffd27a; border-color:#6a4b00; }
+    .verify-box { margin-top:1rem; padding:1rem; border:1px dashed #333; border-radius:12px; background:#121212; }
+    .verify-row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .code-input { padding:.55rem .7rem; border-radius:10px; border:1px solid #2a2a2a; background:#0e0e0e; color:#fff; letter-spacing:.08em; text-transform:uppercase; width:10ch; text-align:center; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .hint { font-size:.8rem; opacity:.75 }
+    @media (min-width: 900px){
+      .viewer { grid-template-columns: 2fr 1fr; align-items:start; }
+    }
+  </style>
+</head>
+<body class="page-enter">
+  <!-- Navbar -->
+  <nav>
+    <div class="nav-left">
+      <a href="{{ url_for('index') }}" aria-label="VISDOM Home">
+        <img src="{{ url_for('static', filename='uploads/Logo_front.png') }}" alt="VISDOM Logo" height="40" loading="eager" decoding="async">
+      </a>
+    </div>
+    <ul>
+      <li><a href="{{ url_for('index') }}">Home</a></li>
+      <li><a href="{{ url_for('crop_page') }}">Crop</a></li>
+      <li><a href="{{ url_for('ocr') }}">OCR</a></li>
+      <li><a href="{{ url_for('verify_init') }}" aria-current="page">Compare</a></li>
+      <li><a href="/inspection">Inspection</a></li>
+      <li><a href="{{ url_for('manual_inspection') }}">Manual Inspection</a></li>
+      <li><a role="menuitem" href="{{ url_for('dashboard') }}">Dashboard</a></li>
+    </ul>
+  </nav>
+
+  <!-- Main -->
+  <main class="max-w-5xl mx-auto px-4 py-8">
+    <h1 class="page-title anim rise" data-delay=".06s">Manual Verification</h1>
+
+    <div id="all-ok" class="banner" role="status" aria-live="polite">🎉 All predictions match. Nothing to review.</div>
+    <div id="empty" class="banner warn" role="status" aria-live="polite">No rows to show for the current filter.</div>
+
+    <div class="toolbar anim rise" data-delay=".08s">
+      <div class="left">
+        <button id="prev" class="btn" disabled>← Prev</button>
+        <span class="counter" id="counter" aria-live="polite">0 / 0</span>
+        <button id="next" class="btn" disabled>Next →</button>
+      </div>
+      <div class="right">
+        <button id="toggle-all" class="btn ghost" title="Show all rows (not only disagreements)">Show all rows</button>
+        <button id="reload" class="btn ghost" title="Reload">Reload</button>
+      </div>
+    </div>
+
+    <section class="viewer card anim rise" data-delay=".10s">
+      <div class="img-wrap">
+        <img id="im" alt="code crop" loading="lazy" decoding="async"/>
+      </div>
+      <div class="info">
+        <div class="meta">
+          <div class="stat"><strong>Image:</strong> <span id="name">—</span></div>
+          <div class="stat"><strong>Status:</strong> <span id="agree" class="pill ok">—</span></div>
+          <div class="stat"><strong>YOLO:</strong> <span id="py">—</span></div>
+          <div class="stat"><strong>CRNN:</strong> <span id="pc">—</span></div>
+        </div>
+
+        <!-- Manual input (visible only when disagree) -->
+        <div id="verify-box" class="verify-box" style="display:none">
+          <!-- IMPORTANT: id=verify-form-local so main.js doesn't bind its own listener -->
+          <form id="verify-form-local" novalidate>
+            <div class="verify-row">
+              <label for="manual-code"><strong>Correct code:</strong></label>
+              <input
+                id="manual-code"
+                class="code-input"
+                name="code"
+                type="text"
+                inputmode="latin"
+                autocomplete="off"
+                placeholder="XXXXXX"
+                minlength="6"
+                maxlength="6"
+                pattern="[0-9A-G]{6}"
+                required
+                aria-describedby="code-hint"
+              />
+              <button id="save-btn" class="btn" type="submit">Save</button>
+              <button id="skip-btn" class="btn ghost" type="button" title="Go to next image">Skip</button>
+              <span id="code-hint" class="hint">Allowed: 0–9, A–G · 6 chars</span>
+            </div>
+            <input type="hidden" id="img-name-hidden" name="image" value="">
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <noscript>
+      <p class="noscript-warning">JavaScript is required to load rows, save corrections, and show status.</p>
+    </noscript>
+  </main>
+
+  <!-- Global toast for status messages -->
+  <div id="toast" class="toast" role="status" aria-live="polite">Ready.</div>
+
+  <!-- Footer -->
+  <footer class="mt-10 text-center text-sm text-gray-500">
+    &copy; Visual Inspection System for Defect Observation and Monitoring. All rights reserved. @AyarLabs
+  </footer>
+
+  <!-- Page JS -->
+  <script>
+    // ---------- Patch /verify_data so images always resolve in LOCAL mode ----------
+    (function(){
+      const origFetch = window.fetch ? window.fetch.bind(window) : null;
+      if (!origFetch) return;
+      window.fetch = async function(input, init){
+        const url = (typeof input === "string") ? input : (input && input.url) || "";
+        if (url && url.indexOf("/verify_data") === 0) {
+          const res = await origFetch(input, init);
+          const clone = res.clone();
+          let j = null;
+          try { j = await clone.json(); } catch(_) {}
+          if (j && Array.isArray(j.items)) {
+            j.items.forEach(it=>{
+              if (!it) return;
+              if (!it.proxy_url) {
+                if (it.img_path) {
+                  it.proxy_url = "/local/" + encodeURI(it.img_path);
+                } else if (it.image && !/^https?:\/\//i.test(it.image)) {
+                  it.proxy_url = "/local/" + encodeURI(it.image);
+                } else if (it.img_url) {
+                  it.proxy_url = it.img_url;
+                }
+              }
+            });
+            return new Response(JSON.stringify(j), {
+              status: res.status,
+              statusText: res.statusText,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+          return res;
+        }
+        return origFetch(input, init);
+      };
+    })();
+
+    // ---------- Page logic ----------
+    (function(){
+      const im     = document.getElementById('im');
+      const nameEl = document.getElementById('name');
+      const pyEl   = document.getElementById('py');
+      const pcEl   = document.getElementById('pc');
+      const agreeEl= document.getElementById('agree');
+      const prev   = document.getElementById('prev');
+      const next   = document.getElementById('next');
+      const counter= document.getElementById('counter');
+      const allOk  = document.getElementById('all-ok');
+      const empty  = document.getElementById('empty');
+      const toggle = document.getElementById('toggle-all');
+      const reloadBtn = document.getElementById('reload');
+
+      // Manual verify UI
+      const verifyBox  = document.getElementById('verify-box');
+      const verifyForm = document.getElementById('verify-form-local');
+      const manualCode = document.getElementById('manual-code');
+      const imgHidden  = document.getElementById('img-name-hidden');
+      const saveBtn    = document.getElementById('save-btn');
+      const skipBtn    = document.getElementById('skip-btn');
+
+      let items = [];
+      let idx = 0;
+      let showingAll = false;
+
+      // Toast
+      const toast = document.getElementById('toast');
+      const showToast = (msg, timeout=1500) => {
+        if (!toast) return;
+        toast.textContent = msg;
+        toast.classList.add('show','toast-show');
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(()=>toast.classList.remove('show','toast-show'), timeout);
+      };
+
+      function setCounter() {
+        const total = items.length;
+        counter.textContent = total ? `${idx+1} / ${total}` : `0 / 0`;
+        prev.disabled = total === 0 || idx === 0;
+        next.disabled = total === 0 || idx >= total - 1;
+      }
+
+      function showManualBox(show, imageName = "") {
+        verifyBox.style.display = show ? "block" : "none";
+        if (show) {
+          imgHidden.value = imageName || "";
+          manualCode.value = "";
+          manualCode.focus();
+        } else {
+          imgHidden.value = "";
+        }
+      }
+
+      function render() {
+        const total = items.length;
+
+        empty.classList.toggle('show', total === 0);
+        if (total === 0) {
+          im.removeAttribute('src');
+          nameEl.textContent = '—';
+          pyEl.textContent   = '—';
+          pcEl.textContent   = '—';
+          agreeEl.textContent = '—';
+          agreeEl.className = 'pill ok';
+          showManualBox(false);
+          setCounter();
+          return;
+        }
+
+        const it = items[idx];
+
+        im.src = it.proxy_url || it.img_url || '';
+        im.alt = it.image || 'code crop';
+        im.onerror = () => {
+          im.removeAttribute('src');
+          console.warn('Image failed to load for', it.image, it);
+        };
+
+        nameEl.textContent = it.image || '—';
+        pyEl.textContent   = it.pred_yolo || '—';
+        pcEl.textContent   = it.pred_crnn || '—';
+        agreeEl.textContent= it.agree || '—';
+        agreeEl.className  = 'pill ' + (it.agree === 'YES' ? 'ok' : 'bad');
+
+        // Show manual input ONLY when mismatch
+        const mismatch = (it.agree !== 'YES');
+        showManualBox(mismatch, it.image || "");
+
+        setCounter();
+      }
+
+      async function load(onlyDisagreements = true){
+        try {
+          const url = `/verify_data?only_disagreements=${onlyDisagreements ? '1':'0'}`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+
+          items = (data && data.items) || [];
+          idx = 0;
+
+          const all_ok = data && data.summary && data.summary.all_ok;
+          allOk.classList.toggle('show', !!all_ok && onlyDisagreements);
+
+          toggle.textContent = onlyDisagreements ? 'Show all rows' : 'Show only disagreements';
+          render();
+        } catch (e) {
+          console.error(e);
+          items = [];
+          idx = 0;
+          allOk.classList.remove('show');
+          empty.classList.add('show');
+          render();
+        }
+      }
+
+      // Single, direct endpoint: /save_verifications with { corrections: { [image]: code } }
+      async function postCorrections(imageName, code) {
+        const payload = { corrections: { [imageName]: code } };
+        const res = await fetch('/save_verifications', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          let msg = `HTTP ${res.status}`;
+          try {
+            const data = await res.json();
+            msg = data.message || data.error || msg;
+          } catch(_) {}
+          throw new Error(msg);
+        }
+        return res.json().catch(()=>({}));
+      }
+
+      // Uppercase + restrict charset as user types
+      manualCode.addEventListener('input', () => {
+        manualCode.value = manualCode.value.toUpperCase().replace(/[^0-9A-G]/g,'');
+      });
+
+      // Save submission
+      verifyForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const code = (manualCode.value || "").toUpperCase().trim();
+        const imageName = imgHidden.value || (items[idx] && items[idx].image) || "";
+
+        if (!/^[0-9A-G]{6}$/.test(code)) {
+          showToast("Enter 6 chars in 0–9 or A–G.");
+          manualCode.focus();
+          return;
+        }
+
+        try {
+          saveBtn.disabled = true;
+          await postCorrections(imageName, code);
+
+          // Mark current row as verified
+          if (items[idx]) items[idx].agree = 'YES';
+          showToast("✅ Saved");
+
+          if (!showingAll) {
+            // In "disagreements only" view, drop the fixed row and continue
+            items.splice(idx, 1);
+            if (idx >= items.length) idx = Math.max(0, items.length - 1);
+            if (items.length === 0) {
+              await load(true);
+              return;
+            }
+            render();
+          } else {
+            // In "show all" view, jump to the next mismatch
+            for (let j = idx + 1; j < items.length; j++) {
+              if (items[j].agree !== 'YES') { idx = j; break; }
+            }
+            render();
+          }
+        } catch (err) {
+          console.warn(err);
+          showToast(`❌ ${err.message || 'Save failed'}`);
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+
+      // Skip: next item
+      skipBtn.addEventListener('click', () => {
+        if (idx < items.length - 1) { idx++; render(); }
+      });
+
+      // Keyboard helpers
+      document.addEventListener('keydown', (e) => {
+        if (verifyBox.style.display !== 'none' && e.key === 'Enter' && document.activeElement === manualCode) {
+          e.preventDefault();
+          verifyForm.requestSubmit();
+          return;
+        }
+        if (e.key === 'ArrowLeft' && !prev.disabled) prev.click();
+        if (e.key === 'ArrowRight' && !next.disabled) next.click();
+      });
+
+      // Nav
+      prev.addEventListener('click', () => { if (idx > 0) { idx--; render(); }});
+      next.addEventListener('click', () => { if (idx < items.length - 1) { idx++; render(); }});
+      toggle.addEventListener('click', () => { showingAll = !showingAll; load(!showingAll); });
+      reloadBtn.addEventListener('click', () => load(!showingAll));
+
+      // initial load: only disagreements
+      load(true);
+    })();
+  </script>
+
+  <!-- App JS (animations, toasts, shared wiring) -->
+  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+</body>
+</html>

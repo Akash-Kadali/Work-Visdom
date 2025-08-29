@@ -1,0 +1,159 @@
+/* ======================= VISDOM · Animations (Unified 2026) =======================
+   - One source of truth for motion tokens + utilities.
+   - Works across pages via classes / [data-anim].
+   - Safe with prefers-reduced-motion.
+=================================================================================== */
+
+/* ---- Tokens ---- */
+:root{
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:  cubic-bezier(0.5,  0, 0.75, 0);
+  --dur-1: .45s;
+  --dur-2: .65s;
+  --dur-3: .9s;
+  --stagger: .08s;
+}
+
+/* ---- Page Enter (apply to <body> or top #app wrapper) ---- */
+.page-enter{
+  animation: vis-enter var(--dur-2) var(--ease-out) both;
+  will-change: opacity, transform, filter;
+}
+@keyframes vis-enter{
+  from{ opacity:0; transform:translateY(40px) scale(.985); filter:blur(6px); }
+  to{   opacity:1; transform:translateY(0)    scale(1);     filter:blur(0);  }
+}
+
+/* ---- Base state (idle before reveal) ---- */
+.anim, [data-anim]{
+  opacity:0;
+  /* Do NOT pre-clear transform/filter here; let presets set their own initial states */
+  will-change: opacity, transform, filter;
+  backface-visibility: hidden;
+  transform: translateZ(0); /* GPU hint */
+}
+
+/* When revealed: only opacity; let keyframes drive transform/filter */
+.anim.is-animated,
+[data-anim].is-animated{
+  opacity:1;
+  /* intentionally NOT setting transform/filter to avoid canceling keyframes */
+}
+
+/* ---- Presets ---- */
+
+/* fade */
+.anim.fade, [data-anim~="fade"]{
+  animation: vis-fade var(--dur-2) var(--ease-out) both;
+}
+@keyframes vis-fade{
+  from{ opacity:0; }
+  to{   opacity:1; }
+}
+
+/* rise (fade + up) */
+.anim.rise, [data-anim~="rise"]{
+  transform: translateY(16px);
+  animation: vis-rise var(--dur-2) var(--ease-out) both;
+}
+@keyframes vis-rise{
+  from{ opacity:0; transform:translateY(16px); }
+  to{   opacity:1; transform:translateY(0);    }
+}
+
+/* slide-left */
+.anim.slide-left, [data-anim~="slide-left"]{
+  transform: translateX(18px);
+  animation: vis-slide-left var(--dur-2) var(--ease-out) both;
+}
+@keyframes vis-slide-left{
+  from{ opacity:0; transform:translateX(18px); }
+  to{   opacity:1; transform:translateX(0);    }
+}
+
+/* slide-right */
+.anim.slide-right, [data-anim~="slide-right"]{
+  transform: translateX(-18px);
+  animation: vis-slide-right var(--dur-2) var(--ease-out) both;
+}
+@keyframes vis-slide-right{
+  from{ opacity:0; transform:translateX(-18px); }
+  to{   opacity:1; transform:translateX(0);     }
+}
+
+/* scale-in */
+.anim.scale, [data-anim~="scale"]{
+  transform: scale(.96);
+  animation: vis-scale var(--dur-2) var(--ease-out) both;
+}
+@keyframes vis-scale{
+  from{ opacity:0; transform: scale(.96); }
+  to{   opacity:1; transform: scale(1);   }
+}
+
+/* blur-in */
+.anim.blur, [data-anim~="blur"]{
+  filter: blur(6px);
+  animation: vis-blur var(--dur-2) var(--ease-out) both;
+}
+@keyframes vis-blur{
+  from{ opacity:0; filter:blur(6px); }
+  to{   opacity:1; filter:blur(0);   }
+}
+
+/* ---- Stagger helpers ---- */
+.anim-delay-1{ animation-delay: calc(var(--stagger) * 1); }
+.anim-delay-2{ animation-delay: calc(var(--stagger) * 2); }
+.anim-delay-3{ animation-delay: calc(var(--stagger) * 3); }
+.anim-delay-4{ animation-delay: calc(var(--stagger) * 4); }
+.anim-delay-5{ animation-delay: calc(var(--stagger) * 5); }
+.anim-delay-6{ animation-delay: calc(var(--stagger) * 6); }
+
+/* Container-based stagger */
+[data-stagger] > *{
+  opacity:0;
+  transform: translateY(10px);
+  will-change: opacity, transform;
+}
+[data-stagger].is-animated > *{
+  animation: vis-rise var(--dur-1) var(--ease-out) both;
+}
+[data-stagger].is-animated > *:nth-child(1){ animation-delay: calc(var(--stagger)*0); }
+[data-stagger].is-animated > *:nth-child(2){ animation-delay: calc(var(--stagger)*1); }
+[data-stagger].is-animated > *:nth-child(3){ animation-delay: calc(var(--stagger)*2); }
+[data-stagger].is-animated > *:nth-child(4){ animation-delay: calc(var(--stagger)*3); }
+[data-stagger].is-animated > *:nth-child(5){ animation-delay: calc(var(--stagger)*4); }
+[data-stagger].is-animated > *:nth-child(6){ animation-delay: calc(var(--stagger)*5); }
+
+/* ---- Toast ---- */
+#toast{
+  transform: translateX(-50%) scale(.96);
+  transition: opacity .45s var(--ease-out), bottom .45s var(--ease-out), transform .45s var(--ease-out);
+}
+#toast.show,
+#toast.toast-show{ /* support both classes used by JS */
+  bottom: 24px;
+  opacity:1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* ---- Spinner ---- */
+.spinner{
+  animation: vis-spin .7s linear infinite;
+}
+@keyframes vis-spin{ to{ transform: rotate(360deg); } }
+
+/* ---- Respect reduced motion ---- */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- Chrome/WebKit progressive rendering nice-to-have ---- */
+@supports (animation-timeline: view()) {
+  /* Optional: view-timeline effects if you want fancy scroll-driven later */
+}

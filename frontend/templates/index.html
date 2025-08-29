@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Meta -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+
+  <!-- SEO -->
+  <title>VISDOM</title>
+  <meta name="description" content="VISDOM: local-first visual inspection toolkit for semiconductor laser-die images. Crop, OCR, compare, inspect, report." />
+  <meta name="theme-color" content="#0a1020" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}" />
+
+  <!-- Icon -->
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='uploads/Logo4.png') }}" />
+
+  <!-- Fonts preconnect (optional if app.css already imports fonts) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}"/>
+
+  <!-- Page layout tweaks (kept tiny; the heavy lifting stays in app.css) -->
+  <style>
+    :root{
+      --sidebar-w: 240px;
+      --surface-1: rgba(255,255,255,.06);
+      --surface-2: rgba(255,255,255,.10);
+      --text-3: #98a1b3;
+    }
+    body{min-height:100vh; display:grid; grid-template-rows:auto 1fr; background:var(--bg, #0a1020);}
+    header.appbar{
+      position:sticky; top:0; z-index:100;
+      display:flex; align-items:center; gap:1rem;
+      padding:.75rem 1rem; background:rgba(0,0,0,.35); backdrop-filter:saturate(140%) blur(10px);
+      border-bottom:1px solid var(--surface-2);
+    }
+    header .brand{display:flex; align-items:center; gap:.6rem; text-decoration:none}
+    header .env{font-size:.75rem; padding:.2rem .5rem; border:1px solid var(--surface-2); border-radius:999px}
+    header .spacer{flex:1}
+    header .top-actions{display:flex; gap:.5rem; align-items:center}
+    .layout{
+      display:grid; grid-template-columns: var(--sidebar-w) 1fr; gap:0; min-height: calc(100vh - 56px);
+    }
+    aside.sidebar{
+      border-right:1px solid var(--surface-2);
+      padding:1rem .75rem; position:sticky; top:56px; height: calc(100vh - 56px); overflow:auto;
+      background:rgba(255,255,255,.02);
+    }
+    .nav-section{margin-bottom:1.25rem}
+    .nav-section h4{font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-3); margin:.25rem .5rem}
+    .vnav{list-style:none; padding:0; margin:.25rem 0}
+    .vnav a{
+      display:flex; align-items:center; gap:.6rem; padding:.55rem .6rem; border-radius:.5rem; text-decoration:none;
+    }
+    .vnav a[aria-current="page"]{background:var(--surface-1);}
+    main.console{
+      padding:1.25rem 1.25rem 2.5rem; overflow:auto;
+    }
+    .grid{display:grid; gap:1rem}
+    .grid.cols-3{grid-template-columns: repeat(12,1fr)}
+    .card{
+      background:var(--surface-1); border:1px solid var(--surface-2);
+      border-radius:12px; padding:1rem;
+    }
+    .card h3{margin:.25rem 0 .5rem}
+    .kpi{display:flex; align-items:center; gap:.6rem; font-size:.95rem; color:var(--text-3)}
+    .kpi strong{font-size:1.1rem; color:inherit}
+    .muted{color:var(--text-3)}
+    .list-tight{margin:.25rem 0 0; padding-left:1.1rem}
+    .pill{display:inline-block; padding:.15rem .5rem; border-radius:999px; background:var(--surface-2); font-size:.7rem}
+    .light{
+      display:inline-block; width:12px; height:12px; border-radius:50%;
+      border:2px solid rgba(255,255,255,.28); vertical-align:middle; margin-left:.4rem
+    }
+    .light.red{background:#ff4d4f}.light.orange{background:#ffa940}.light.yellow{background:#fadb14}.light.green{background:#52c41a}
+    .status-inline{display:inline-block; min-height:1.25rem; margin-left:.5rem}
+    table{width:100%; border-collapse:separate; border-spacing:0}
+    th, td{padding:.55rem .6rem; border-bottom:1px solid var(--surface-2); font-size:.95rem}
+    th{font-weight:600; text-align:left}
+    tr:last-child td{border-bottom:0}
+    .sr-only{position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden}
+    footer{padding:1rem; color:var(--text-3); border-top:1px solid var(--surface-2)}
+    @media (max-width: 1024px){
+      :root{ --sidebar-w: 200px; }
+      .grid.cols-3{grid-template-columns: 1fr}
+    }
+  </style>
+
+  <!-- CSP -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self';" />
+</head>
+
+<body data-app="visdom">
+  <a href="#content" class="sr-only">Skip to content</a>
+
+  <!-- Top App Bar -->
+  <header class="appbar" role="banner">
+    <a href="{{ url_for('index') }}" class="brand">
+      <img src="{{ url_for('static', filename='uploads/Logo_front.png') }}" alt="VISDOM" width="44" height="30" />
+      <strong>VISDOM</strong>
+      <span class="env">v{{ build_version|default('0.1.0') }}</span>
+    </a>
+    <span class="spacer"></span>
+
+    <div class="top-actions">
+      <!-- Master status (kept IDs for JS) -->
+      <span class="muted">Status</span>
+      <span id="master-light" class="light green" aria-label="Idle"></span>
+      <span id="master-status" class="status-inline muted">Idle.</span>
+
+      <!-- Safe shutdown (POST) -->
+      <form action="{{ url_for('shutdown') }}" method="post">
+        <button id="shutdown-btn" class="btn btn-danger" type="submit" title="Close VISDOM">⏻ Shutdown</button>
+      </form>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" role="navigation" aria-label="Primary">
+      <div class="nav-section">
+        <h4>Overview</h4>
+        <ul class="vnav">
+          <li><a href="{{ url_for('index') }}" aria-current="page">Home</a></li>
+          <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <h4>Modules</h4>
+        <ul class="vnav">
+          <li><a href="{{ url_for('crop_page') }}">Crop</a></li>
+          <li><a href="{{ url_for('ocr') }}">OCR</a></li>
+          <li><a href="{{ url_for('verify_init') }}">Compare</a></li>
+          <li><a href="{{ url_for('inspection') }}">Inspection</a></li>
+          <li><a href="{{ url_for('manual_inspection') }}">Manual Inspection</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <h4>Help</h4>
+        <ul class="vnav">
+          <li><a href="#" onclick="document.getElementById('toast').textContent='Docs coming soon';return false;">Documentation</a></li>
+          <li><a href="#" onclick="document.getElementById('toast').textContent='Shortcuts: Shift+R run';return false;">Keyboard Shortcuts</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main console -->
+    <main id="content" class="console" role="main">
+      <!-- Headline + quick context -->
+      <section class="grid" aria-label="Intro">
+        <div class="card">
+          <h1 style="margin:.25rem 0 .25rem">Welcome</h1>
+          <p class="muted">Local-first visual inspection for laser-die images. No cloud, no uploads.</p>
+          <ul class="list-tight muted">
+            <li>Crop → OCR → Compare → Inspect → Report</li>
+            <li>Three inspection levels: <span class="pill">Mini</span> <span class="pill">Moderate</span> <span class="pill">Max</span></li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>System Health</h3>
+          <div class="kpi"><span class="pill">Models</span> <strong id="kpi-models">MaxViT • CoAtNet • SwinV2</strong></div>
+          <div class="kpi"><span class="pill">Storage</span> <strong id="kpi-storage">Local CSV & images</strong></div>
+          <div class="kpi"><span class="pill">Runs</span> <strong id="kpi-runs">No pending jobs</strong></div>
+          <p class="muted" style="margin:.5rem 0 0">Live state reflects backend status polling.</p>
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <section class="grid cols-3" aria-label="Actions & Status">
+        <!-- Quick Actions -->
+        <div class="card" style="grid-column: span 5">
+          <h3>Quick Actions</h3>
+          <p class="muted">End-to-end pipeline. Idempotent. Skips when no new images are found.</p>
+          <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center">
+            <button id="master-btn" class="btn btn-primary" type="button">Run full automation</button>
+            <span class="muted">Legend:</span>
+            <span class="pill">Green = idle/complete</span>
+            <span class="pill">Yellow/Orange = running</span>
+            <span class="pill">Red = error</span>
+          </div>
+        </div>
+
+        <!-- Paths (static copy; keep generic) -->
+        <div class="card" style="grid-column: span 3">
+          <h3>Paths</h3>
+          <ul class="list-tight muted">
+            <li>Images: <code>data/images/</code></li>
+            <li>Outputs: <code>data/output/</code></li>
+            <li>CSVs: <code>data/csv/</code></li>
+            <li>Temp: <code>data/tmp/</code></li>
+          </ul>
+          <p class="muted" style="margin-top:.5rem">Configured in backend. Local filesystem only.</p>
+        </div>
+
+        <!-- Shortcuts -->
+        <div class="card" style="grid-column: span 4">
+          <h3>Shortcuts</h3>
+          <ul class="list-tight muted">
+            <li><kbd>Shift</kbd> + <kbd>R</kbd> — Run full automation</li>
+            <li><kbd>/</kbd> — Focus search (when available)</li>
+            <li><kbd>?</kbd> — Show help</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Recent runs -->
+      <section class="card" aria-label="Recent Runs">
+        <h3>Recent Runs</h3>
+        <table aria-label="Recent runs">
+          <thead>
+            <tr>
+              <th scope="col">Started</th>
+              <th scope="col">Steps</th>
+              <th scope="col">New Images</th>
+              <th scope="col">Duration</th>
+              <th scope="col">Result</th>
+            </tr>
+          </thead>
+          <tbody id="recent-runs-tbody">
+            <!-- Optional: main.js can populate; static placeholder below -->
+            <tr>
+              <td class="muted">—</td>
+              <td class="muted">Crop → OCR → Inspect</td>
+              <td class="muted">—</td>
+              <td class="muted">—</td>
+              <td class="muted">No runs yet</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Notes -->
+      <section class="card" aria-label="Notes">
+        <h3>Notes</h3>
+        <ul class="list-tight muted">
+          <li>Image I/O is <strong>local-first</strong>; no Google Drive required.</li>
+          <li>Outputs (CSVs, reports) are written locally and overwrite safely.</li>
+          <li>All interactive tools live on their dedicated pages in the sidebar.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite">Ready.</div>
+
+  <!-- Footer -->
+  <footer role="contentinfo">
+    <p>&copy; VISDOM — Visual Inspection System for Defect Observation and Monitoring.</p>
+  </footer>
+
+  <!-- App JS -->
+  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+</body>
+</html>

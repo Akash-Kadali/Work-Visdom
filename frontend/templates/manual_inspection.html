@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Meta -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <title>VISDOM • Manual Inspection</title>
+  <meta name="description" content="Manual verification of laser/critical/body defects with model votes, severity colors, filters, undo, and base-wide defect marking." />
+  <meta name="theme-color" content="#0a1020" />
+
+  <!-- CSP (inline script required for the /manual_data fetch patch) -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+                 img-src 'self' data: blob:;
+                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+                 font-src https://fonts.gstatic.com;
+                 script-src 'self' 'unsafe-inline';
+                 connect-src 'self';" />
+
+  <!-- Icon -->
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='uploads/Logo4.png') }}" />
+
+  <!-- Fonts preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
+
+  <!-- Page layout + module cosmetics -->
+  <style>
+    :root{
+      --sidebar-w: 240px;
+      --surface-1: rgba(255,255,255,.06);
+      --surface-2: rgba(255,255,255,.10);
+      --text-3: #98a1b3;
+
+      --sev-red:#ff4d4f; --sev-orange:#ffa940; --sev-yellow:#fadb14; --sev-green:#52c41a;
+      --chip-bg:rgba(255,255,255,.06);
+    }
+
+    /* Layout */
+    body{min-height:100vh; display:grid; grid-template-rows:auto 1fr; background:var(--bg,#0a1020);}
+    header.appbar{
+      position:sticky; top:0; z-index:100; display:flex; align-items:center; gap:1rem;
+      padding:.75rem 1rem; background:rgba(0,0,0,.35); backdrop-filter:saturate(140%) blur(10px);
+      border-bottom:1px solid var(--surface-2);
+    }
+    header .brand{display:flex; align-items:center; gap:.6rem; text-decoration:none}
+    header .env{font-size:.75rem; padding:.2rem .5rem; border:1px solid var(--surface-2); border-radius:999px}
+    header .spacer{flex:1}
+
+    .layout{display:grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: calc(100vh - 56px);}
+    aside.sidebar{
+      border-right:1px solid var(--surface-2); padding:1rem .75rem; position:sticky; top:56px;
+      height: calc(100vh - 56px); overflow:auto; background:rgba(255,255,255,.02);
+    }
+    .nav-section{margin-bottom:1.25rem}
+    .nav-section h4{font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-3); margin:.25rem .5rem}
+    .vnav{list-style:none; padding:0; margin:.25rem 0}
+    .vnav a{display:flex; align-items:center; gap:.6rem; padding:.55rem .6rem; border-radius:.5rem; text-decoration:none}
+    .vnav a[aria-current="page"]{background:var(--surface-1);}
+
+    main.console{padding:1.25rem 1.25rem 2.5rem; overflow:auto;}
+    .grid{display:grid; gap:1rem}
+
+    .card{background:var(--surface-1); border:1px solid var(--surface-2); border-radius:16px; padding:1rem;}
+    .muted{color:var(--text-3)}
+    .status-inline{display:inline-block; min-height:1.25rem; margin-left:.5rem}
+    .pill{display:inline-block;padding:.25rem .6rem;border-radius:999px;background:var(--surface-2);font-size:.75rem;line-height:1}
+
+    .light{display:inline-block; width:12px; height:12px; border-radius:50%; border:2px solid rgba(255,255,255,.28); margin-left:.4rem}
+    .light.red{background:#ff4d4f}.light.orange{background:#ffa940}.light.yellow{background:#fadb14}.light.green{background:#52c41a}
+
+    /* Viewer / panel */
+    .viewer-wrap{display:grid; gap:1rem; grid-template-columns:1fr; align-items:start}
+    @media(min-width:1100px){.viewer-wrap{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}}
+
+    .stage{
+      background:#0b0b0f; border:1px solid rgba(255,255,255,.1); border-radius:16px;
+      display:flex; align-items:center; justify-content:center; min-height:60vh; position:relative; overflow:hidden;
+    }
+    .stage img{max-width:100%; max-height:80vh; object-fit:contain; display:block}
+    .crumb{position:absolute; top:.5rem; left:.5rem; background:rgba(0,0,0,.5); padding:.25rem .5rem; border-radius:8px; font-size:.85rem}
+    .pos{position:absolute; top:.5rem; right:.5rem; background:rgba(0,0,0,.5); padding:.25rem .5rem; border-radius:8px; font-variant-numeric:tabular-nums}
+
+    .panel{border:1px solid rgba(255,255,255,.12); border-radius:16px; overflow:hidden; background:rgba(255,255,255,.02)}
+    .panel header, .panel footer{padding:.75rem 1rem; border-bottom:1px solid rgba(255,255,255,.12)}
+    .panel footer{border-top:1px solid rgba(255,255,255,.12); border-bottom:0}
+    .panel .body{padding:1rem}
+    .kv{display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin:.25rem 0}
+    .badge{display:inline-block; padding:.2rem .55rem; border-radius:999px; background:var(--chip-bg); font-size:.8rem}
+
+    .votes{display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:.5rem}
+    .vote{border:1px dashed rgba(255,255,255,.15); border-radius:.6rem; padding:.45rem .6rem; display:flex; align-items:center; justify-content:space-between}
+    .good{color:var(--sev-green)} .bad{color:var(--sev-red)} .na{opacity:.7}
+
+    .severity-chip{display:inline-flex; align-items:center; gap:.5rem; border-radius:999px; padding:.2rem .6rem; background:var(--chip-bg)}
+    .dot{width:.6rem;height:.6rem;border-radius:50%}
+    .sev-3{background:var(--sev-red)} .sev-2{background:var(--sev-orange)} .sev-1{background:var(--sev-yellow)} .sev-0{background:var(--sev-green)}
+
+    .toolbar{display:flex; gap:1rem; align-items:center; flex-wrap:wrap; justify-content:space-between}
+    .filters{display:flex; gap:.75rem; align-items:center; flex-wrap:wrap}
+    .legend{display:flex; gap:.5rem; align-items:center; flex-wrap:wrap}
+    .legend .pill .dot{width:.55rem;height:.55rem;display:inline-block;border-radius:50%;margin-right:.35rem;vertical-align:middle}
+
+    /* Buttons (light overrides to match app palette) */
+    .btn{padding:.55rem .9rem; border-radius:.6rem; border:1px solid rgba(255,255,255,.16); background:#14151a; color:#fff; cursor:pointer}
+    .btn:hover{filter:brightness(1.06)}
+    .btn-primary{background:var(--accent, #3366ff); border-color:transparent}
+    .btn-ghost{background:transparent}
+    .btn[disabled]{opacity:.5; cursor:not-allowed}
+
+    /* Modal */
+    dialog.modal{border:0;border-radius:12px;padding:0;overflow:hidden;background:#0f1117;color:#e7e9ee;width:min(520px,92vw)}
+    .modal header, .modal footer{padding:.9rem 1rem}
+    .modal header{border-bottom:1px solid #20242f}
+    .modal footer{border-top:1px solid #20242f; display:flex; justify-content:flex-end; gap:.5rem}
+    .modal .body{padding:1rem}
+    .checkbox{display:flex; gap:.5rem; align-items:center; margin-top:.6rem; font-size:.95rem; opacity:.9}
+
+    /* Toast (global) */
+    .toast{position:fixed; bottom:16px; right:16px; background:#14151a; color:#fff; padding:.6rem .8rem; border-radius:.6rem; opacity:0; transform:translateY(8px); transition:.25s; pointer-events:none; border:1px solid rgba(255,255,255,.15)}
+    .toast.show{opacity:1; transform:translateY(0)}
+
+    .sr-only{position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden}
+    footer.site{padding:1rem; color:var(--text-3); border-top:1px solid var(--surface-2)}
+    @media (max-width: 1024px){
+      :root{ --sidebar-w: 200px; }
+    }
+  </style>
+</head>
+
+<body data-app="visdom" data-page="manual">
+  <a class="sr-only" href="#content">Skip to content</a>
+
+  <!-- Top App Bar -->
+  <header class="appbar" role="banner">
+    <a href="{{ url_for('index') }}" class="brand" aria-label="VISDOM Home">
+      <img src="{{ url_for('static', filename='uploads/Logo_front.png') }}" alt="VISDOM Logo" width="44" height="30" />
+      <strong>VISDOM • Manual Inspection</strong>
+      <span class="env">v{{ build_version|default('0.1.0') }}</span>
+    </a>
+    <span class="spacer"></span>
+
+    <div class="top-actions" style="display:flex; gap:.75rem; align-items:center">
+      <span class="muted">Status</span>
+      <span id="master-light" class="light green" aria-label="Idle"></span>
+      <span id="master-status" class="status-inline muted">Idle.</span>
+
+      <!-- Safe shutdown (POST) -->
+      <form action="{{ url_for('shutdown') }}" method="post">
+        <button id="shutdown-btn" class="btn btn-danger" type="submit" title="Close VISDOM">⏻ Shutdown</button>
+      </form>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" role="navigation" aria-label="Primary">
+      <div class="nav-section">
+        <h4>Overview</h4>
+        <ul class="vnav">
+          <li><a href="{{ url_for('index') }}">Home</a></li>
+          <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <h4>Modules</h4>
+        <ul class="vnav">
+          <li><a href="{{ url_for('crop_page') }}">Crop</a></li>
+          <li><a href="{{ url_for('ocr') }}">OCR</a></li>
+          <li><a href="{{ url_for('verify_init') }}">Compare</a></li>
+          <li><a href="{{ url_for('inspection') }}">Inspection</a></li>
+          <li><a href="{{ url_for('manual_inspection') }}" aria-current="page">Manual Inspection</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <h4>Help</h4>
+        <ul class="vnav">
+          <li><a href="#" onclick="document.getElementById('toast').textContent='Docs coming soon';return false;">Documentation</a></li>
+          <li><a href="#" onclick="document.getElementById('toast').textContent='Shortcuts: ←/→ nav, D/G/U/R';return false;">Keyboard Shortcuts</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main console -->
+    <main id="content" class="console" role="main">
+      <!-- Intro -->
+      <section class="grid" aria-label="Intro">
+        <div class="card">
+          <h1 style="margin:.25rem 0 .25rem">Manual Inspection</h1>
+          <p class="muted">
+            First, click <strong>Prepare Defects</strong> to build three defect-only folders from:
+            <code>laser_all_models.csv</code>, <code>critical_all_models.csv</code>, and
+            <code>body_coat_model.csv</code>. Review shows an image if <em>any</em> model says Defective (≥1/3).
+          </p>
+        </div>
+
+        <div class="card">
+          <h3>Paths</h3>
+          <ul class="list-tight muted">
+            <li>Images: <code>data/images/</code></li>
+            <li>Outputs: <code>data/output/</code></li>
+            <li>Defect folders: <code>laser_defects/</code>, <code>critical_defects/</code>, <code>body_defects/</code></li>
+          </ul>
+          <p class="muted" style="margin-top:.5rem">Local filesystem only. No cloud.</p>
+        </div>
+      </section>
+
+      <!-- Prepare Defects -->
+      <section class="card" aria-labelledby="prep-title">
+        <h2 id="prep-title" class="sr-only">Prepare Defects</h2>
+        <p class="muted">
+          Collect only defective images into the three region folders. Manual review uses only these folders.
+        </p>
+        <!-- main.js expects these exact IDs -->
+        <form id="collect-defects-form" novalidate>
+          <button id="collect-defects-btn" class="btn btn-primary" type="submit" data-runonce="true">
+            Prepare Defects
+          </button>
+          <span id="collect-status" class="status-inline" aria-live="polite"></span>
+        </form>
+        <p class="muted" style="margin-top:.5rem">
+          Grouping rule: <code>{name}_laser_die_{1-20}_{laser|critical|body}.{png|jpg}</code>.<br />
+          Marking any one as <strong>Defective</strong> removes the entire base set from the queue.
+        </p>
+      </section>
+
+      <!-- Filters / Controls -->
+      <section class="card" aria-label="Controls">
+        <div class="toolbar">
+          <div class="filters">
+            <label><input id="only-bad" type="checkbox" checked /> <span>Show only bad</span></label>
+            <label>
+              <select id="region-filter" aria-label="Filter by region">
+                <option value="all">All regions</option>
+                <option value="laser">Laser</option>
+                <option value="critical">Critical</option>
+                <option value="body">Body</option>
+              </select>
+            </label>
+            <label><input id="hide-decided" type="checkbox" /> <span>Hide decided</span></label>
+            <span class="muted">Page size: 50</span>
+            <span class="muted" id="counter"></span>
+          </div>
+          <div class="legend">
+            <span class="pill"><span class="dot sev-3"></span>3/3 Defective</span>
+            <span class="pill"><span class="dot sev-2"></span>2/3 Defective</span>
+            <span class="pill"><span class="dot sev-1"></span>1/3 Defective</span>
+            <span class="pill"><span class="dot sev-0"></span>All Good</span>
+          </div>
+          <div class="controls">
+            <button id="prev" class="btn" type="button" title="Arrow Left">Prev</button>
+            <button id="next" class="btn" type="button" title="Arrow Right">Next</button>
+            <button id="undo" class="btn" type="button" disabled title="U">Undo</button>
+            <button id="reload" class="btn btn-ghost" type="button" title="R">Reload</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Viewer -->
+      <section class="viewer-wrap" aria-label="Reviewer">
+        <!-- Image Stage -->
+        <div class="stage" id="stage" aria-live="polite">
+          <div class="crumb" id="crumb">—</div>
+          <div class="pos" id="pos">0/0</div>
+          <img id="img" src="" alt="Current image" />
+        </div>
+
+        <!-- Info + Actions -->
+        <article class="panel" aria-label="Details">
+          <header>
+            <strong id="title">—</strong>
+          </header>
+          <div class="body">
+            <div class="kv"><strong>Base:</strong> <span id="base" class="badge">—</span></div>
+            <div class="kv"><strong>Region:</strong> <span id="region" class="badge">—</span></div>
+            <div class="kv">
+              <strong>Severity:</strong>
+              <span id="sevchip" class="severity-chip" title="Models that voted Defective">
+                <span id="sevdot" class="dot sev-0"></span>
+                <span id="sevtext">0/3 Defective</span>
+              </span>
+            </div>
+
+            <div class="votes" style="margin-top:.6rem">
+              <div class="vote"><span>MaxViT</span><strong id="v-maxvit" class="na">N/A</strong></div>
+              <div class="vote"><span>CoaT</span><strong id="v-coat" class="na">N/A</strong></div>
+              <div class="vote"><span>SwinV2</span><strong id="v-swinv2" class="na">N/A</strong></div>
+            </div>
+          </div>
+          <footer>
+            <div class="controls">
+              <button id="mark-def-base" class="btn btn-primary" type="button" title="D">Mark Defective (base)</button>
+              <button id="mark-good" class="btn" type="button" title="G">Mark Good (this)</button>
+            </div>
+            <p class="muted" style="margin:.5rem 0 0">
+              <strong>Shortcuts:</strong> ←/→ navigate • D = Mark base Defective • G = Mark Good • U = Undo • R = Reload
+            </p>
+          </footer>
+        </article>
+      </section>
+
+      <!-- Confirmation modal -->
+      <dialog id="confirm-modal" class="modal" aria-modal="true">
+        <header><strong>Change to <em>Good</em>?</strong></header>
+        <div class="body">
+          <p>You are marking a currently <strong>Defective</strong> image as <strong>Good</strong>.</p>
+          <label class="checkbox"><input id="dont-ask-again" type="checkbox" /> <span>Don't ask again</span></label>
+        </div>
+        <footer>
+          <button id="confirm-cancel" class="btn" type="button">Cancel</button>
+          <button id="confirm-ok" class="btn btn-primary" type="button">Yes, continue</button>
+        </footer>
+      </dialog>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite">Ready.</div>
+
+  <!-- Footer -->
+  <footer class="site" role="contentinfo">
+    <p class="muted">&copy; VISDOM — Manual Inspection Module.</p>
+  </footer>
+
+  <!-- FETCH PATCH: ensure images load by turning img_path -> /local/<img_path> before main.js consumes /manual_data -->
+  <script>
+    (function(){
+      const origFetch = window.fetch ? window.fetch.bind(window) : null;
+      if (!origFetch) return;
+      window.fetch = async function(input, init){
+        try{
+          const url = (typeof input === "string") ? input : (input && input.url) || "";
+          if (url && url.indexOf("/manual_data") === 0) {
+            const res = await origFetch(input, init);
+            const clone = res.clone();
+            let j = null;
+            try { j = await clone.json(); } catch(_) {}
+            if (j && j.items && Array.isArray(j.items)) {
+              j.items.forEach(it => {
+                if (!it || it.proxy_url) return;
+                if (it.img_path) {
+                  it.proxy_url = "/local/" + encodeURI(it.img_path);
+                } else if (it.image && !/^https?:\/\//i.test(it.image)) {
+                  it.proxy_url = "/local/" + encodeURI(it.image);
+                }
+              });
+              return new Response(JSON.stringify(j), {
+                status: res.status,
+                statusText: res.statusText,
+                headers: { "Content-Type": "application/json" }
+              });
+            }
+            return res;
+          }
+        }catch(_){}
+        return origFetch(input, init);
+      };
+    })();
+  </script>
+
+  <!-- App JS -->
+  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+</body>
+</html>

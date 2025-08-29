@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Meta -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <title>VISDOM • OCR</title>
+  <meta name="description" content="Run OCR pipeline (YOLO + CRNN), merge predictions, and resolve mismatches in Compare. Local-first, production UI." />
+  <meta name="theme-color" content="#0a1020" />
+
+  <!-- CSP (safe for fonts + main.js fetch) -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+                 img-src 'self' data: blob:;
+                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+                 font-src https://fonts.gstatic.com;
+                 script-src 'self';
+                 connect-src 'self';" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='uploads/Logo4.png') }}" />
+
+  <!-- Preconnects -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
+
+  <!-- Page layout tweaks (keep light; core tokens live in app.css) -->
+  <style>
+    :root{
+      --sidebar-w: 240px;
+      --surface-1: rgba(255,255,255,.06);
+      --surface-2: rgba(255,255,255,.10);
+      --text-3: #98a1b3;
+    }
+    body{min-height:100vh; display:grid; grid-template-rows:auto 1fr; background:var(--bg,#0a1020);}
+    header.appbar{
+      position:sticky; top:0; z-index:100; display:flex; align-items:center; gap:1rem;
+      padding:.75rem 1rem; background:rgba(0,0,0,.35); backdrop-filter:saturate(140%) blur(10px);
+      border-bottom:1px solid var(--surface-2);
+    }
+    header .brand{display:flex; align-items:center; gap:.6rem; text-decoration:none}
+    header .env{font-size:.75rem; padding:.2rem .5rem; border:1px solid var(--surface-2); border-radius:999px}
+    header .spacer{flex:1}
+
+    .layout{display:grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: calc(100vh - 56px);}
+    aside.sidebar{
+      border-right:1px solid var(--surface-2); padding:1rem .75rem; position:sticky; top:56px;
+      height: calc(100vh - 56px); overflow:auto; background:rgba(255,255,255,.02);
+    }
+    .nav-section{margin-bottom:1.25rem}
+    .nav-section h4{font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-3); margin:.25rem .5rem}
+    .vnav{list-style:none; padding:0; margin:.25rem 0}
+    .vnav a{display:flex; align-items:center; gap:.6rem; padding:.55rem .6rem; border-radius:.5rem; text-decoration:none}
+    .vnav a[aria-current="page"]{background:var(--surface-1);}
+
+    main.console{padding:1.25rem 1.25rem 2.5rem; overflow:auto;}
+    .grid{display:grid; gap:1rem}
+    .card{background:var(--surface-1); border:1px solid var(--surface-2); border-radius:16px; padding:1rem;}
+    .hdr{display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.5rem}
+    .muted{color:var(--text-3)}
+    .status-inline{display:inline-block; min-height:1.25rem; margin-left:.5rem}
+    .form-actions{display:flex; align-items:center; gap:.75rem; flex-wrap:wrap}
+    .pill{display:inline-block; padding:.15rem .5rem; border-radius:999px; background:var(--surface-2); font-size:.7rem}
+    .light{display:inline-block; width:12px; height:12px; border-radius:50%; border:2px solid rgba(255,255,255,.28); margin-left:.4rem}
+    .light.red{background:#ff4d4f}.light.orange{background:#ffa940}.light.yellow{background:#fadb14}.light.green{background:#52c41a}
+    footer{padding:1rem; color:var(--text-3); border-top:1px solid var(--surface-2)}
+    .sr-only{position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden}
+    @media (max-width: 1024px){
+      :root{ --sidebar-w: 200px; }
+    }
+  </style>
+</head>
+
+<body data-app="visdom" data-page="ocr">
+  <a href="#content" class="sr-only">Skip to content</a>
+
+  <!-- Top App Bar -->
+  <header class="appbar" role="banner">
+    <a href="{{ url_for('index') }}" class="brand" aria-label="VISDOM Home">
+      <img src="{{ url_for('static', filename='uploads/Logo_front.png') }}" alt="VISDOM Logo" width="44" height="30" />
+      <strong>VISDOM • OCR</strong>
+      <span class="env">v{{ build_version|default('0.1.0') }}</span>
+    </a>
+    <span class="spacer"></span>
+
+    <div class="top-actions" style="display:flex; gap:.75rem; align-items:center">
+      <span class="muted">Status</span>
+      <span id="master-light" class="light green" aria-label="Idle"></span>
+      <span id="master-status" class="status-inline muted">Idle.</span>
+
+      <!-- Safe shutdown (POST) -->
+      <form action="{{ url_for('shutdown') }}" method="post">
+        <button id="shutdown-btn" class="btn btn-danger" type="submit" title="Close VISDOM">⏻ Shutdown</button>
+      </form>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" role="navigation" aria-label="Primary">
+      <div class="nav-section">
+        <h4>Overview</h4>
+        <ul class="vnav">
+          <li><a href="{{ url_for('index') }}">Home</a></li>
+          <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <h4>Modules</h4>
+        <ul class="vnav">
+          <li><a href="{{ url_for('crop_page') }}">Crop</a></li>
+          <li><a href="{{ url_for('ocr') }}" aria-current="page">OCR</a></li>
+          <li><a href="{{ url_for('verify_init') }}">Compare</a></li>
+          <li><a href="{{ url_for('inspection') }}">Inspection</a></li>
+          <li><a href="{{ url_for('manual_inspection') }}">Manual Inspection</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <h4>Help</h4>
+        <ul class="vnav">
+          <li><a href="#" onclick="document.getElementById('toast').textContent='Docs coming soon';return false;">Documentation</a></li>
+          <li><a href="#" onclick="document.getElementById('toast').textContent='Shortcuts: Shift+O run';return false;">Keyboard Shortcuts</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main console -->
+    <main id="content" class="console" role="main">
+      <!-- Intro -->
+      <section class="grid" aria-label="Intro">
+        <div class="card">
+          <h1 style="margin:.25rem 0 .25rem">OCR (YOLO + CRNN)</h1>
+          <p class="muted">Run detection + recognition on <strong>code crops</strong>, produce <code>ocr_results.csv</code>, and resolve mismatches in <em>Compare</em>.</p>
+        </div>
+        <div class="card">
+          <h3>Paths</h3>
+          <ul class="list-tight muted">
+            <li>Code crops: <code>data/output/code/</code></li>
+            <li>Results: <code>data/csv/ocr_results.csv</code></li>
+            <li>Images: <code>data/images/</code></li>
+          </ul>
+          <p class="muted" style="margin-top:.5rem">Local filesystem only. No cloud.</p>
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <section class="card" aria-labelledby="ocr-actions-title">
+        <h2 id="ocr-actions-title" class="sr-only">OCR Actions</h2>
+        <div class="form-actions">
+          <!-- Run pipeline -->
+          <form id="run-pipeline-form" action="{{ url_for('run_pipeline') }}" method="post" novalidate>
+            <button
+              id="run-pipeline-submit"
+              type="submit"
+              class="btn btn-primary"
+              data-runonce="true"
+              aria-label="Run Full Pipeline (YOLO + CRNN)">
+              Run Full Pipeline (YOLO + CRNN)
+            </button>
+            <span id="run-pipeline-status" aria-live="polite" class="status-inline muted">Ready.</span>
+          </form>
+
+          <!-- Start manual verification -->
+          <a id="verify-init-btn" class="btn" href="{{ url_for('verify_init') }}" aria-label="Start Manual Verification">
+            Start Manual Verification
+          </a>
+        </div>
+        <p class="muted" style="margin:.5rem 0 0">
+          Runs YOLO + CRNN on code crops, merges predictions into <code>ocr_results.csv</code>, and flags any mismatches automatically.
+        </p>
+      </section>
+
+      <!-- How it works -->
+      <section class="card" aria-labelledby="steps-title">
+        <h2 id="steps-title" class="sr-only">How it works</h2>
+        <ol class="list-tight muted" style="margin-left:1.25rem">
+          <li>Run OCR pipeline on code crops.</li>
+          <li>Merge YOLO and CRNN predictions into <code>ocr_results.csv</code>.</li>
+          <li>Automatically flag mismatches.</li>
+          <li>Open <em>Compare</em> to approve/fix and export a verified CSV.</li>
+        </ol>
+      </section>
+
+      <!-- Optional: Recent OCR runs (placeholder for main.js to populate if desired) -->
+      <section class="card" aria-label="Recent Runs">
+        <h3>Recent Runs</h3>
+        <div class="list" style="max-height:260px; overflow:auto; border:1px solid var(--surface-2); border-radius:12px">
+          <table style="width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:.9rem">
+            <thead>
+              <tr>
+                <th style="position:sticky;top:0;background:var(--surface-2);text-align:left;padding:.45rem .55rem">Started</th>
+                <th style="position:sticky;top:0;background:var(--surface-2);text-align:left;padding:.45rem .55rem">Images</th>
+                <th style="position:sticky;top:0;background:var(--surface-2);text-align:left;padding:.45rem .55rem">Mismatches</th>
+                <th style="position:sticky;top:0;background:var(--surface-2);text-align:left;padding:.45rem .55rem">Duration</th>
+                <th style="position:sticky;top:0;background:var(--surface-2);text-align:left;padding:.45rem .55rem">Result</th>
+              </tr>
+            </thead>
+            <tbody id="ocr-runs-tbody">
+              <tr><td colspan="5" class="muted" style="padding:.6rem">No runs yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite">Ready.</div>
+
+  <!-- Footer -->
+  <footer role="contentinfo">
+    <p class="muted">&copy; VISDOM — OCR Module.</p>
+  </footer>
+
+  <!-- JS -->
+  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+</body>
+</html>
